@@ -258,11 +258,18 @@
     },
     {
       "label": "Start application",
+      "dependsOn": [
+        "Start bot",
+        "Start frontend"
+      ]
+    },
+    {
+      "label": "Start bot",
       "type": "shell",
       "command": "npm run dev:teamsfx",
       "isBackground": true,
       "options": {
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}/bot"
       },
       "problemMatcher": {
         "pattern": {
@@ -275,6 +282,28 @@
           "activeOnStart": true,
           "beginsPattern": ".*",
           "endsPattern": "listening on port 3978|[nodemon] app crashed"
+        }
+      }
+    },
+    {
+      "label": "Start frontend",
+      "type": "shell",
+      "command": "npm run dev:teamsfx",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}/tab"
+      },
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^.*$",
+          "file": 0,
+          "location": 1,
+          "message": 2
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Compiled|Failed|compiled|failed"
         }
       }
     },
