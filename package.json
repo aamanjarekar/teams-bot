@@ -21,8 +21,10 @@
     },
     "dependencies": {
         "@azure/identity": "^4.11.1",
+        "@google/genai": "^1.0.0",
         "@microsoft/teams.apps": "^2.0.0",
-        "@microsoft/teams.common": "^2.0.0"
+        "@microsoft/teams.common": "^2.0.0",
+        "@modelcontextprotocol/sdk": "^1.30.0"
     },
     "devDependencies": {
         "@types/node": "^22.0.0",
