@@ -510,6 +510,41 @@ A system that can answer:
 
 > "Who is most likely to help me with this?"
 
+### Jira Fallback Flow
+
+When the internal knowledge base has no match for a topic, fall back to Jira before giving up:
+
+```text
+User asks: find expert for X
+      ↓
+Search past issues (local knowledge base)
+      ↓
+   Found? ──yes──▶ Suggest expert from past issues
+      │
+      no
+      ↓
+Query Jira for related work (issues/tickets mentioning X)
+      ↓
+Identify who worked on that Jira issue (assignee/reporter)
+      ↓
+Suggest that person as the expert
+      ↓
+Record this issue + resolution into past issues
+   (so future lookups hit the local knowledge base first)
+```
+
+### Tasks
+
+- Define Jira API credentials/auth (API token + email, or OAuth) and where they're stored
+- Add a Jira search step (JQL keyword search) used only when the local knowledge base has no match
+- Map a matched Jira issue to a suggested expert (assignee, or most recent contributor)
+- Write the discovered issue/expert back into the local knowledge base so it's found locally next time
+- Handle "no match in Jira either" gracefully
+
+### Deliverable
+
+Expert Finder that self-improves: local knowledge base first, Jira as fallback, every fallback result becomes future local knowledge.
+
 ---
 
 # Workstream 6 — AI Integration

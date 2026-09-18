@@ -89,6 +89,7 @@
       "dependsOn": [
         "Validate prerequisites (Microsoft 365 Agents Playground)",
         "Deploy (Microsoft 365 Agents Playground)",
+        "Start API",
         "Start application (Microsoft 365 Agents Playground)",
         "Start Microsoft 365 Agents Playground"
       ],
@@ -108,8 +109,35 @@
         "portOccupancy": [
           3978, // app service port
           9239, // app inspector port for Node.js debugger
-          56150 // Microsoft 365 Agents Playground port
+          56150, // Microsoft 365 Agents Playground port
+          4000 // internal API port (experts/incidents backend)
         ]
+      }
+    },
+    {
+      // Start the internal API server (experts/incidents backend) that the bot's
+      // find_expert / search_incidents / raise_incident tools call. See api/src/index.ts.
+      "label": "Start API",
+      "type": "shell",
+      "command": "npm run dev",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}/api"
+      },
+      "problemMatcher": {
+        "pattern": [
+          {
+            "regexp": "^.*$",
+            "file": 0,
+            "location": 1,
+            "message": 2
+          }
+        ],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "\\[nodemon\\] starting",
+          "endsPattern": "listening on port 4000|\\[nodemon\\] app crashed"
+        }
       }
     },
     {
@@ -208,7 +236,8 @@
         ],
         "portOccupancy": [
           3978, // app port,
-          9239 // app inspector port for Node.js debugger
+          9239, // app inspector port for Node.js debugger
+          4000 // internal API port (experts/incidents backend)
         ]
       }
     },
@@ -259,6 +288,7 @@
     {
       "label": "Start application",
       "dependsOn": [
+        "Start API",
         "Start bot",
         "Start frontend"
       ]
