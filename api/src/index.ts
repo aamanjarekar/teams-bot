@@ -1,6 +1,8 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { db } from "./db";
+import { findExpertsViaJira } from "./jira";
 
 const app = express();
 app.use(cors());
@@ -11,16 +13,11 @@ interface ExpertRow {
   role: string;
   resolved_count: number;
   last_active: string;
+  jiraUrl?: string;
 }
 
-// GET /experts?topic=erp
-app.get("/experts", (req, res) => {
-  const topic = String(req.query.topic ?? "").toLowerCase().trim();
-  if (!topic) {
-    return res.status(400).json({ error: "Query param 'topic' is required" });
-  }
-
-  const rows = db
+function findExpertsByTopic(topic: string): ExpertRow[] {
+  return db
     .prepare(
       `SELECT e.name as name, e.role as role, s.resolved_count as resolved_count, s.last_active as last_active
        FROM expert_skills s
@@ -29,14 +26,69 @@ app.get("/experts", (req, res) => {
        ORDER BY s.resolved_count DESC`,
     )
     .all(topic) as unknown as ExpertRow[];
+}
+
+// Record Jira-sourced matches into the local knowledge base so future lookups
+// for this topic are served locally instead of hitting Jira again.
+function recordExpertsFromJira(
+  matches: { assigneeName: string; issueUrl: string }[],
+  topic: string,
+): ExpertRow[] {
+  const lastActive = new Date().toISOString().slice(0, 10);
+
+  return matches.map(({ assigneeName, issueUrl }) => {
+    const existing = db.prepare("SELECT id FROM experts WHERE name = ?").get(assigneeName) as
+      | { id: number }
+      | undefined;
+
+    const expertId =
+      existing?.id ??
+      (db
+        .prepare("INSERT INTO experts (name, role) VALUES (?, ?)")
+        .run(assigneeName, "Jira Contributor").lastInsertRowid as number);
+
+    db.prepare(
+      `INSERT INTO expert_skills (expert_id, topic, resolved_count, last_active)
+       VALUES (?, ?, 1, ?)`,
+    ).run(expertId, topic, lastActive);
+
+    return {
+      name: assigneeName,
+      role: "Jira Contributor",
+      resolved_count: 1,
+      last_active: lastActive,
+      jiraUrl: issueUrl,
+    };
+  });
+}
+
+// GET /experts?topic=erp
+app.get("/experts", async (req, res) => {
+  const topic = String(req.query.topic ?? "").toLowerCase().trim();
+  if (!topic) {
+    return res.status(400).json({ error: "Query param 'topic' is required" });
+  }
+
+  let rows = findExpertsByTopic(topic);
+  let source: "knowledge_base" | "jira" = "knowledge_base";
+
+  if (rows.length === 0) {
+    const jiraMatches = await findExpertsViaJira(topic, 3);
+    if (jiraMatches.length > 0) {
+      rows = recordExpertsFromJira(jiraMatches, topic);
+      source = "jira";
+    }
+  }
 
   res.json({
     topic,
+    source,
     experts: rows.map((r) => ({
       name: r.name,
       role: r.role,
       resolvedCount: r.resolved_count,
       lastActive: r.last_active,
+      ...(r.jiraUrl ? { jiraUrl: r.jiraUrl } : {}),
     })),
   });
 });
