@@ -232,12 +232,17 @@
         "prerequisites": [
           "nodejs", // Validate if Node.js is installed.
           "m365Account", // Sign-in prompt for Microsoft 365 account, then validate if the account enables the sideloading permission.
+          "devCert", // Generate and trust a localhost certificate so Teams will load the tab over HTTPS.
           "portOccupancy" // Validate available ports to ensure those debug ones are not occupied.
         ],
+        "devCert": {
+          "trust": true
+        },
         "portOccupancy": [
           3978, // app port,
           9239, // app inspector port for Node.js debugger
-          4000 // internal API port (experts/incidents backend)
+          4000, // internal API port (experts/incidents backend)
+          53000 // Dashboard tab dev server (tab/, see TAB_ENDPOINT)
         ]
       }
     },
@@ -299,7 +304,7 @@
       "command": "npm run dev:teamsfx",
       "isBackground": true,
       "options": {
-        "cwd": "${workspaceFolder}/bot"
+        "cwd": "${workspaceFolder}"
       },
       "problemMatcher": {
         "pattern": {
@@ -333,7 +338,7 @@
         "background": {
           "activeOnStart": true,
           "beginsPattern": ".*",
-          "endsPattern": "Compiled|Failed|compiled|failed"
+          "endsPattern": "ready in|Local:|error when starting dev server"
         }
       }
     },

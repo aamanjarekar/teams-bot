@@ -2,12 +2,43 @@ import { FunctionDeclaration, Type } from "@google/genai";
 
 const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:4000";
 
+/**
+ * A person the API told us about during this turn.
+ *
+ * The knowledge base and Teams know people by different display names, so we
+ * carry the email through and let the mention resolver match on that.
+ */
+export interface ExpertIdentity {
+  name: string;
+  email?: string;
+}
+
+/** Called by a tool whenever its result names people we might want to tag. */
+export type IdentityCollector = (identities: ExpertIdentity[]) => void;
+
+export type ToolHandler = (
+  args: Record<string, unknown>,
+  collect: IdentityCollector,
+) => Promise<string>;
+
 async function callApi(path: string, init?: RequestInit): Promise<string> {
   const res = await fetch(`${API_BASE_URL}${path}`, init);
   if (!res.ok) {
     return JSON.stringify({ error: `Request failed with status ${res.status}: ${res.statusText}` });
   }
   return JSON.stringify(await res.json());
+}
+
+/** Pull `{ name, email }` out of an /experts response, ignoring malformed bodies. */
+function readIdentities(raw: string): ExpertIdentity[] {
+  try {
+    const body = JSON.parse(raw) as { experts?: ExpertIdentity[] };
+    return (body.experts ?? [])
+      .filter((e) => typeof e?.name === "string")
+      .map((e) => ({ name: e.name, email: e.email }));
+  } catch {
+    return [];
+  }
 }
 
 export const findExpertDeclaration: FunctionDeclaration = {
@@ -26,8 +57,15 @@ export const findExpertDeclaration: FunctionDeclaration = {
   },
 };
 
-async function findExpert(args: Record<string, unknown>): Promise<string> {
-  return callApi(`/experts?topic=${encodeURIComponent(String(args.topic ?? ""))}`);
+async function findExpert(
+  args: Record<string, unknown>,
+  collect: IdentityCollector,
+): Promise<string> {
+  const raw = await callApi(
+    `/experts?topic=${encodeURIComponent(String(args.topic ?? ""))}`,
+  );
+  collect(readIdentities(raw));
+  return raw;
 }
 
 export const searchIncidentsDeclaration: FunctionDeclaration = {
@@ -73,8 +111,11 @@ export const raiseIncidentDeclaration: FunctionDeclaration = {
   },
 };
 
-async function raiseIncident(args: Record<string, unknown>): Promise<string> {
-  return callApi("/incidents", {
+async function raiseIncident(
+  args: Record<string, unknown>,
+  collect: IdentityCollector,
+): Promise<string> {
+  const raw = await callApi("/incidents", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -83,6 +124,8 @@ async function raiseIncident(args: Record<string, unknown>): Promise<string> {
       priority: args.priority,
     }),
   });
+  collect(readIdentities(raw));
+  return raw;
 }
 
 export const toolDeclarations: FunctionDeclaration[] = [
@@ -91,7 +134,7 @@ export const toolDeclarations: FunctionDeclaration[] = [
   raiseIncidentDeclaration,
 ];
 
-export const toolHandlers: Record<string, (args: Record<string, unknown>) => Promise<string>> = {
+export const toolHandlers: Record<string, ToolHandler> = {
   find_expert: findExpert,
   search_incidents: searchIncidents,
   raise_incident: raiseIncident,
