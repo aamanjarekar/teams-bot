@@ -11,6 +11,7 @@ app.use(express.json());
 interface ExpertRow {
   name: string;
   role: string;
+  email?: string;
   resolved_count: number;
   last_active: string;
   jiraUrl?: string;
@@ -19,7 +20,7 @@ interface ExpertRow {
 function findExpertsByTopic(topic: string): ExpertRow[] {
   return db
     .prepare(
-      `SELECT e.name as name, e.role as role, s.resolved_count as resolved_count, s.last_active as last_active
+      `SELECT e.name as name, e.role as role, e.email as email, s.resolved_count as resolved_count, s.last_active as last_active
        FROM expert_skills s
        JOIN experts e ON e.id = s.expert_id
        WHERE lower(s.topic) = ?
@@ -86,6 +87,7 @@ app.get("/experts", async (req, res) => {
     experts: rows.map((r) => ({
       name: r.name,
       role: r.role,
+      ...(r.email ? { email: r.email } : {}),
       resolvedCount: r.resolved_count,
       lastActive: r.last_active,
       ...(r.jiraUrl ? { jiraUrl: r.jiraUrl } : {}),
@@ -147,14 +149,14 @@ app.post("/incidents", (req, res) => {
 
   const skillRows = db
     .prepare(
-      `SELECT e.name as name
+      `SELECT e.name as name, e.email as email
        FROM expert_skills s
        JOIN experts e ON e.id = s.expert_id
        WHERE lower(s.topic) = ?
        ORDER BY s.resolved_count DESC
        LIMIT 2`,
     )
-    .all(String(category).toLowerCase()) as unknown as { name: string }[];
+    .all(String(category).toLowerCase()) as unknown as { name: string; email?: string }[];
 
   const suggestedExperts = skillRows.map((r) => r.name).join(", ") || "Unassigned";
   const assignedTeam = `${String(category).toUpperCase()} Support`;
@@ -169,6 +171,12 @@ app.post("/incidents", (req, res) => {
   ).run(incidentCode, title, category, priority, assignedTeam, suggestedExperts, "Open");
 
   res.status(201).json({
+    // Structured alongside the `suggestedExperts` string so the bot can
+    // @mention these people instead of only naming them.
+    experts: skillRows.map((r) => ({
+      name: r.name,
+      ...(r.email ? { email: r.email } : {}),
+    })),
     incidentCode,
     title,
     category,

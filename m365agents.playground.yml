@@ -23,3 +23,7 @@ deploy:
       target: ./.localConfigs.playground
       envs:
         PORT: 3978
+        # Without this the bot cannot reach Gemini and every message falls
+        # back to the "trouble reaching the AI service" reply. The value
+        # lives in env/.env.playground.user, which is gitignored.
+        GEMINI_API_KEY: ${{SECRET_GEMINI_API_KEY}}

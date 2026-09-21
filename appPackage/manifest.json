@@ -54,10 +54,22 @@
     ],
     "composeExtensions": [],
     "configurableTabs": [],
-    "staticTabs": [],
+    "staticTabs": [
+        {
+            "entityId": "dashboard",
+            "name": "Dashboard",
+            "contentUrl": "${{TAB_ENDPOINT}}/index.html",
+            "websiteUrl": "${{TAB_ENDPOINT}}/index.html",
+            "scopes": [
+                "personal"
+            ]
+        }
+    ],
     "permissions": [
         "identity",
         "messageTeamMembers"
     ],
-    "validDomains": []
+    "validDomains": [
+        "localhost"
+    ]
 }
