@@ -3,13 +3,13 @@ import type { IAdaptiveCard } from "@microsoft/teams.cards";
 /**
  * Where the "Open Dashboard" button points.
  *
- * Set DASHBOARD_URL in .localConfigs to override. Once the Teams tab in tab/
- * is wired up (workstream 3) this becomes the tab's deep link and the button
- * can be swapped for a real staticTab entry in appPackage/manifest.json.
+ * Defaults to the local tab/ dev server (Vite, see tab/vite.config.ts) - only
+ * reachable from the same machine, which is fine for local Playground/dev use.
+ * Set DASHBOARD_URL in .localConfigs to override. Once this dashboard is
+ * actually deployed somewhere reachable, point this at that URL instead (or
+ * swap the button for a real staticTab entry in appPackage/manifest.json).
  */
-export const DASHBOARD_URL =
-  process.env.DASHBOARD_URL ||
-  "https://claude.ai/code/artifact/19a0b02d-e2fc-45b6-9f36-992517e0a9c4";
+export const DASHBOARD_URL = process.env.DASHBOARD_URL || "http://localhost:53000";
 
 /** The skills the bot advertises, shown on the welcome and /help cards. */
 const SKILLS = [
