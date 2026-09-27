@@ -3,8 +3,46 @@ import { toolDeclarations, toolHandlers } from "./tools";
 import type { ExpertIdentity } from "./tools";
 
 const ai = new GoogleGenAI({});
-const MODEL = "gemini-3.6-flash";
+const MODEL = "gemini-3.5-flash-lite";
 const MAX_TOOL_TURNS = 5;
+
+export interface GeminiRateLimitInfo {
+  /** Seconds until Gemini says it's safe to retry, if it told us. */
+  retryAfterSeconds?: number;
+  /** The quota-exceeded message straight from Gemini's API response. */
+  detail: string;
+}
+
+/**
+ * If `error` is a 429 from the Gemini API (@google/genai's `ApiError`),
+ * pulls out the human-readable quota message and retry delay so the bot can
+ * tell the user what's actually wrong instead of a generic failure message.
+ */
+export function parseGeminiRateLimit(error: unknown): GeminiRateLimitInfo | null {
+  const status = (error as { status?: unknown } | null)?.status;
+  if (status !== 429) return null;
+
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  try {
+    const parsed = JSON.parse(rawMessage) as {
+      error?: {
+        message?: string;
+        details?: { "@type"?: string; retryDelay?: string }[];
+      };
+    };
+    const retryInfo = parsed.error?.details?.find((d) => d["@type"]?.includes("RetryInfo"));
+    const retryAfterSeconds = retryInfo?.retryDelay
+      ? Math.ceil(parseFloat(retryInfo.retryDelay))
+      : undefined;
+
+    return {
+      retryAfterSeconds,
+      detail: parsed.error?.message ?? rawMessage,
+    };
+  } catch {
+    return { detail: rawMessage };
+  }
+}
 
 const SYSTEM_INSTRUCTION = `You are "Engineering Operations Copilot", a Microsoft Teams bot that helps engineers find experts, search past incidents, and raise new incidents.
 

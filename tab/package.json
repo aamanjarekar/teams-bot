@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "dev:teamsfx": "env-cmd --silent -f ../.localConfigs vite"
+    "dev:teamsfx": "env-cmd --silent -f ../.localConfigs vite",
+    "stop": "node ../scripts/kill-port.js 53000"
   },
   "dependencies": {
     "@microsoft/teams-js": "^2.56.0",

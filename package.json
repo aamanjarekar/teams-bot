@@ -13,7 +13,9 @@
         "build": "tsc --build",
         "start": "node ./dist/bot/index.js",
         "watch": "nodemon --exec \"npm run start\"",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "stop": "node ./scripts/kill-port.js 3978 9239",
+        "stop:all": "node ./scripts/kill-port.js 3978 9239 4000 53000 56150"
     },
     "repository": {
         "type": "git",

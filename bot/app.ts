@@ -7,9 +7,9 @@ import { App } from "@microsoft/teams.apps";
 import { LocalStorage } from "@microsoft/teams.common";
 import config from "./config";
 import { ManagedIdentityCredential } from "@azure/identity";
-import { getAIReply } from "./ai";
-import { dashboardCard, DASHBOARD_URL } from "./cards";
-import { getRoster, mentionableNames, toMentionMessage } from "./mentions";
+import { getAIReply, parseGeminiRateLimit } from "./ai";
+import { dashboardCard, DASHBOARD_URL, expertContactCard, type ChatTarget } from "./cards";
+import { getRoster, mentionableNames, resolveMember, toMentionMessage } from "./mentions";
 
 // Create storage for conversation history
 const storage = new LocalStorage();
@@ -174,8 +174,41 @@ app.on("message", async (context) => {
       mentionableNames(roster),
     );
     await context.send(toMentionMessage(aiReply, roster, directory));
+
+    // A "Start chat" button only makes sense for experts Teams can actually
+    // add to a new conversation - i.e. members of this one. See bot/mentions.ts.
+    const chatTargets: ChatTarget[] = [];
+    const seenIds = new Set<string>();
+    for (const identity of directory) {
+      const member = resolveMember(roster, identity.name, directory);
+      if (member && !seenIds.has(member.id)) {
+        seenIds.add(member.id);
+        chatTargets.push({ name: member.name, id: member.id, aadObjectId: member.aadObjectId });
+      }
+    }
+    if (chatTargets.length > 0) {
+      await context.send(
+        new MessageActivityInput().addCard("adaptive", expertContactCard(chatTargets)),
+      );
+    }
   } catch (error) {
     console.error("Error calling Gemini:", error);
+
+    const rateLimit = parseGeminiRateLimit(error);
+    if (rateLimit) {
+      await context.send(`
+  ⏳ Gemini's free-tier rate limit is exceeded right now${rateLimit.retryAfterSeconds ? ` — try again in about ${rateLimit.retryAfterSeconds}s` : ""}.
+
+${rateLimit.detail}
+
+Here's what I can normally help with:
+
+👤 **Find an Expert** — e.g. "who knows erp"
+📚 **Search Previous Issues** — e.g. "booking validation failed"
+🚨 **Raise an Incident** — e.g. "raise incident"
+  `);
+      return;
+    }
 
     await context.send(`
   ⚠️ I'm having trouble reaching the AI service right now, so I can't answer that at the moment.
@@ -188,6 +221,60 @@ Here's what I can normally help with:
 
 Please try again in a moment.
   `);
+  }
+});
+
+// Fired by the "Start chat" button on expertContactCard (bot/cards.ts). Creates
+// a new Teams group chat with the requester, the chosen expert, and this bot -
+// the bot ends up a member automatically since it's the one creating the
+// conversation via its own Bot Connector credentials, no Graph lookup needed.
+app.on("card.action.start_chat", async (context) => {
+  const data = context.activity.value.action.data as {
+    expertId?: string;
+    expertAadObjectId?: string;
+    expertName?: string;
+  };
+
+  if (!data.expertId || !data.expertName) {
+    return {
+      statusCode: 200,
+      type: "application/vnd.microsoft.activity.message",
+      value: "⚠️ Missing expert details, couldn't start that chat.",
+    } as const;
+  }
+
+  const requester = context.activity.from;
+  try {
+    await context.api.conversations.create({
+      isGroup: true,
+      tenantId: context.activity.conversation.tenantId,
+      members: [
+        requester,
+        {
+          id: data.expertId,
+          aadObjectId: data.expertAadObjectId,
+          name: data.expertName,
+          role: "user",
+        },
+      ],
+      activity: {
+        type: "message",
+        text: `👋 ${requester.name ?? "Someone"} wants to loop in ${data.expertName} — started via the Engineering Operations Copilot.`,
+      },
+    });
+
+    return {
+      statusCode: 200,
+      type: "application/vnd.microsoft.activity.message",
+      value: `✅ Started a group chat with you and ${data.expertName}.`,
+    } as const;
+  } catch (error) {
+    console.error("Could not start group chat:", error);
+    return {
+      statusCode: 200,
+      type: "application/vnd.microsoft.activity.message",
+      value: `⚠️ Couldn't start a chat with ${data.expertName} right now.`,
+    } as const;
   }
 });
 

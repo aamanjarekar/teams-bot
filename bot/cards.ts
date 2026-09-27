@@ -62,3 +62,67 @@ export function dashboardCard(heading: string, intro: string): IAdaptiveCard {
     ],
   };
 }
+
+/** A roster member we can start a group chat with, per `bot/mentions.ts`. */
+export interface ChatTarget {
+  name: string;
+  id: string;
+  aadObjectId?: string;
+}
+
+/**
+ * One "start a chat" row per expert who is a member of this conversation
+ * (only they can be added to a new Teams conversation - see `bot/mentions.ts`).
+ *
+ * Each button is an `Action.Execute` carrying `data.action: "start_chat"`,
+ * routed by `app.on("card.action.start_chat", ...)` in `bot/app.ts`, which
+ * creates a group chat with the requester, the expert, and this bot.
+ */
+export function expertContactCard(experts: ChatTarget[]): IAdaptiveCard {
+  return {
+    type: "AdaptiveCard",
+    $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
+    version: "1.5",
+    body: experts.map((expert) => ({
+      type: "ColumnSet",
+      spacing: "Medium",
+      columns: [
+        {
+          type: "Column",
+          width: "stretch",
+          verticalContentAlignment: "Center",
+          items: [
+            {
+              type: "TextBlock",
+              text: expert.name,
+              weight: "Bolder",
+              wrap: true,
+            },
+          ],
+        },
+        {
+          type: "Column",
+          width: "auto",
+          items: [
+            {
+              type: "ActionSet",
+              actions: [
+                {
+                  type: "Action.Execute",
+                  title: "\u{1F4AC} Start chat",
+                  verb: "start_chat",
+                  data: {
+                    action: "start_chat",
+                    expertId: expert.id,
+                    expertAadObjectId: expert.aadObjectId,
+                    expertName: expert.name,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })),
+  };
+}

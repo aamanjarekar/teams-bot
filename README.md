@@ -69,3 +69,52 @@ Following documentation will help you to extend the Basic Bot template.
 - [Publish the app to your organization or the Microsoft app store](https://learn.microsoft.com/microsoftteams/platform/toolkit/publish)
 - [Develop with Microsoft 365 Agents Toolkit CLI](https://aka.ms/teams-toolkit-cli/debug)
 - [Preview the app on mobile clients](https://aka.ms/teamsfx-mobile)
+
+## Running this project
+
+### 1. Install dependencies (three separate projects)
+
+```bash
+npm install
+cd api && npm install && cd ..
+cd tab && npm install && cd ..
+```
+
+### 2. Set up local secrets (gitignored, not in the repo)
+
+Create these files:
+
+- `.localConfigs` and `.localConfigs.playground` — each needs:
+  ```
+  PORT=3978
+  GEMINI_API_KEY=<your Gemini API key>
+  ```
+- `env/.env.playground.user`:
+  ```
+  SECRET_GEMINI_API_KEY=<same Gemini API key>
+  ```
+- `api/.env`:
+  ```
+  JIRA_BASE_URL=https://sk-demo-bot.atlassian.net
+  JIRA_EMAIL=<your Atlassian account email>
+  JIRA_API_TOKEN=<your Jira API token, from id.atlassian.com/manage-profile/security/api-tokens>
+  ```
+
+### 3. Start everything
+
+Easiest: open this folder in VS Code with the Microsoft 365 Agents Toolkit extension, press **F5**, and choose **Debug in Microsoft 365 Agents Playground** — this now starts the internal API, the bot, and the Playground together.
+
+To run it by hand instead:
+
+```bash
+# terminal 1 - internal API (experts, incidents, Jira fallback)
+cd api && npm run dev
+
+# terminal 2 - the bot itself
+npm run dev:teamsfx:playground
+
+# terminal 3 - the Playground UI
+npm run dev:teamsfx:launch-playground
+```
+
+Then open the Playground in your browser and start chatting with the bot.

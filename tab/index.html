@@ -519,7 +519,8 @@ const PRIO={High:{cls:"pill-crit",ico:"▲"},Medium:{cls:"pill-warn",ico:"◆"},
 const STATUS={
   "Resolved":{cls:"pill-good",ico:"✓"},
   "In progress":{cls:"pill-warn",ico:"◔"},
-  "Awaiting acknowledgement":{cls:"pill-crit",ico:"○"}
+  "Awaiting acknowledgement":{cls:"pill-crit",ico:"○"},
+  "Open":{cls:"pill-crit",ico:"○"}
 };
 const FEAT={ship:{ico:"✓",cls:"st-ship",label:"Shipped"},prog:{ico:"◔",cls:"st-prog",label:"In progress"},plan:{ico:"○",cls:"st-plan",label:"Planned"}};
 const sevColor=p=>p==="High"?"var(--crit)":p==="Medium"?"var(--warn)":"var(--border-strong)";
@@ -776,7 +777,7 @@ function drawerIncident(code){
         return e?'<button class="link-btn" data-expert="'+e.id+'">'+esc(n)+'</button>':esc(n);}).join(", ")+'</dd>'+
       '<dt>Raised by</dt><dd>'+esc(i.raisedBy)+'</dd>'+
       '<dt>Opened</dt><dd class="mono">'+esc(i.opened)+'</dd>'+
-      '<dt>Match confidence</dt><dd>'+i.confidence+'%</dd></dl></div>'+
+      '<dt>Match confidence</dt><dd>'+(i.confidence!=null?i.confidence+'%':"&mdash;")+'</dd></dl></div>'+
 
     '<div class="d-sec"><div class="eyebrow">History</div><div class="tl">'+
       i.timeline.map(t=>
@@ -1005,7 +1006,50 @@ themeBtn.addEventListener("click",()=>{
   themeBtn.textContent=labels[mode];
 });
 
+/* ================================================================
+   LIVE DATA — pulls real experts/incidents from the api/ server and
+   puts them ahead of the dummy rows above. Dummy rows for names/codes
+   that are now backed by a live row are dropped so nothing shows twice;
+   everything else (knowledge, systems, roadmap - no backing API yet)
+   stays as-is. Best-effort: if the API isn't reachable, the dashboard
+   just keeps showing dummy data.
+   ================================================================ */
+const API_BASE_URL = "http://localhost:4000";
+
+async function loadLiveData(){
+  try {
+    const [expertsRes, incidentsRes] = await Promise.all([
+      fetch(API_BASE_URL+"/experts/all").then(r=>r.ok?r.json():null),
+      fetch(API_BASE_URL+"/incidents/all").then(r=>r.ok?r.json():null),
+    ]);
+
+    if(expertsRes && Array.isArray(expertsRes.experts)){
+      const live=expertsRes.experts.map(e=>({
+        id:"db-"+e.id, name:e.name, role:e.role, team:e.team, skills:e.skills, seed:true,
+      }));
+      const liveNames=new Set(live.map(e=>e.name));
+      DATA.experts=live.concat(DATA.experts.filter(e=>!liveNames.has(e.name)));
+    }
+
+    if(incidentsRes && Array.isArray(incidentsRes.incidents)){
+      const live=incidentsRes.incidents.map(i=>({
+        code:i.incidentCode, title:i.title, category:i.category, priority:i.priority,
+        status:i.status, team:i.assignedTeam, experts:i.suggestedExperts,
+        opened:i.createdAt, raisedBy:"—", confidence:null, similar:[], knowledge:null, seed:true,
+        timeline:[["—","Raised outside the demo timeline (real API data, not seeded example data)","accent",""]],
+      }));
+      const liveCodes=new Set(live.map(i=>i.code));
+      DATA.incidents=live.concat(DATA.incidents.filter(i=>!liveCodes.has(i.code)));
+    }
+
+    go(current);
+  } catch(e){
+    console.warn("Dashboard: couldn't load live data from", API_BASE_URL, "- showing demo data only.", e);
+  }
+}
+
 go("overview");
+loadLiveData();
 </script>
 
 

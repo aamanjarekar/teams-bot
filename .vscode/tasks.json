@@ -90,6 +90,7 @@
         "Validate prerequisites (Microsoft 365 Agents Playground)",
         "Deploy (Microsoft 365 Agents Playground)",
         "Start API",
+        "Start Dashboard Tab",
         "Start application (Microsoft 365 Agents Playground)",
         "Start Microsoft 365 Agents Playground"
       ],
@@ -110,8 +111,36 @@
           3978, // app service port
           9239, // app inspector port for Node.js debugger
           56150, // Microsoft 365 Agents Playground port
-          4000 // internal API port (experts/incidents backend)
+          4000, // internal API port (experts/incidents backend)
+          53000 // Dashboard tab dev server (tab/, see tab/vite.config.ts)
         ]
+      }
+    },
+    {
+      // Start the dashboard tab (tab/) so it's viewable at its dev URL
+      // alongside the Playground. The Playground itself has no Teams tab
+      // surface, so this is opened directly in a browser, not embedded.
+      "label": "Start Dashboard Tab",
+      "type": "shell",
+      "command": "npm run dev",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}/tab"
+      },
+      "problemMatcher": {
+        "pattern": [
+          {
+            "regexp": "^.*$",
+            "file": 0,
+            "location": 1,
+            "message": 2
+          }
+        ],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "ready in|Local:|error when starting dev server"
+        }
       }
     },
     {
@@ -369,6 +398,14 @@
         "args": {
             "url": "teams.microsoft.com/l/app/${{TEAMS_APP_ID}}?installAppPackage=true"
         }
+    },
+    {
+      // Frees ports 3978/9239/4000/53000/56150. A manual fallback for when
+      // stopping a debug session doesn't kill nodemon's child process on
+      // Windows (see scripts/kill-port.js) and a port is left held.
+      "label": "Stop All",
+      "type": "shell",
+      "command": "npm run stop:all"
     }
   ]
 }
