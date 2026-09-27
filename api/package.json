@@ -4,9 +4,10 @@
   "description": "Internal API backing the Engineering Operations Copilot bot (experts, incidents)",
   "main": "./dist/index.js",
   "scripts": {
-    "dev": "nodemon --exec ts-node ./src/index.ts",
+    "dev": "nodemon --exec ts-node --signal SIGINT ./src/index.ts",
     "build": "tsc --build",
-    "start": "node ./dist/index.js"
+    "start": "node ./dist/index.js",
+    "stop": "node ../scripts/kill-port.js 4000"
   },
   "dependencies": {
     "cors": "^2.8.5",

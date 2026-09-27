@@ -95,6 +95,51 @@ app.get("/experts", async (req, res) => {
   });
 });
 
+/**
+ * Best-guess team per topic, for the dashboard's per-team expert grouping.
+ * There's no `team` column on `experts` - this mirrors the ad hoc mapping the
+ * demo dashboard data (tab/index.html) already uses. Unknown topics (e.g. a
+ * fresh Jira fallback topic) fall back to "<TOPIC> Support".
+ */
+const TEAM_BY_TOPIC: Record<string, string> = {
+  erp: "ERP Support",
+  booking: "ERP Support",
+  spektrum: "Spektrum",
+  azure: "Platform Support",
+  login: "Platform Support",
+};
+
+function teamForTopic(topic: string): string {
+  return TEAM_BY_TOPIC[topic] ?? `${topic.toUpperCase()} Support`;
+}
+
+// GET /experts/all - every expert with all of their skills, for the dashboard.
+app.get("/experts/all", (_req, res) => {
+  const experts = db
+    .prepare("SELECT id, name, role, email FROM experts ORDER BY name")
+    .all() as { id: number; name: string; role: string; email: string | null }[];
+
+  const skillsByExpert = db
+    .prepare(
+      "SELECT expert_id, topic, resolved_count, last_active FROM expert_skills ORDER BY resolved_count DESC",
+    )
+    .all() as { expert_id: number; topic: string; resolved_count: number; last_active: string }[];
+
+  res.json({
+    experts: experts.map((e) => {
+      const skills = skillsByExpert.filter((s) => s.expert_id === e.id);
+      return {
+        id: e.id,
+        name: e.name,
+        role: e.role,
+        ...(e.email ? { email: e.email } : {}),
+        team: teamForTopic(skills[0]?.topic ?? "general"),
+        skills: skills.map((s) => [s.topic, s.resolved_count, s.last_active]),
+      };
+    }),
+  });
+});
+
 interface IncidentRow {
   incident_code: string;
   title: string;
@@ -127,6 +172,30 @@ app.get("/incidents", (req, res) => {
   res.json({
     query,
     count: rows.length,
+    incidents: rows.map((r) => ({
+      incidentCode: r.incident_code,
+      title: r.title,
+      category: r.category,
+      priority: r.priority,
+      assignedTeam: r.assigned_team,
+      suggestedExperts: r.suggested_experts.split(", "),
+      status: r.status,
+      createdAt: r.created_at,
+    })),
+  });
+});
+
+// GET /incidents/all - every incident, for the dashboard.
+app.get("/incidents/all", (_req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT incident_code, title, category, priority, assigned_team, suggested_experts, status, created_at
+       FROM incidents
+       ORDER BY created_at DESC`,
+    )
+    .all() as unknown as IncidentRow[];
+
+  res.json({
     incidents: rows.map((r) => ({
       incidentCode: r.incident_code,
       title: r.title,
